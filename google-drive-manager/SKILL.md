@@ -1,6 +1,6 @@
 ---
 name: google-drive-manager
-description: Use when an AI agent needs to manage files in Google Drive - uploading, searching, downloading, updating, or deleting files. Triggers on user instructions like "backup to cloud", "find file in Drive", "update cloud file", "download from Drive", or "delete from Drive". Requires Google Cloud Service Account credentials.
+description: Use when an AI agent needs to interact with Google Drive files. Triggers when user says "backup to cloud", "find file in Drive", "download from Drive", "update cloud file", or "delete from Drive". Requires Google Cloud Service Account credentials.
 ---
 
 # Google Drive Manager

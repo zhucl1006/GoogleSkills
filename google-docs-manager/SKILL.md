@@ -1,6 +1,6 @@
 ---
 name: google-docs-manager
-description: Use when an AI agent needs to manage Google Docs - creating, searching, reading, editing, or deleting documents. Triggers on instructions like "create a doc", "find document", "read doc content", "append to doc", "replace text in doc", or "delete document". Requires Google Cloud Service Account credentials.
+description: Use when an AI agent needs to interact with Google Docs. Triggers when user says "create a doc", "find document", "read doc content", "append to doc", "replace text in doc", or "delete document". Requires Google Cloud Service Account credentials.
 ---
 
 # Google Docs Manager
@@ -13,6 +13,12 @@ Manage Google Docs via Service Account — no browser interaction required, full
 2. Service Account JSON key file
 3. Set `GOOGLE_CREDENTIALS_PATH=/path/to/credentials.json`
 4. Install: `pip install -r requirements.txt`
+
+## When to Use
+
+- User says: "create a doc", "write a document", "find doc", "read doc content", "append/insert/replace text in doc", "delete document"
+- Agent needs to read or modify Google Docs content programmatically
+- **Not for** downloading binary files or managing non-Doc files (use google-drive-manager instead)
 
 ## Quick Reference
 
@@ -65,3 +71,13 @@ python scripts/docs.py replace-text <doc_id> "old section" "updated section"
 python scripts/auth.py status      # Check credentials file
 python scripts/auth.py validate    # Test API connectivity
 ```
+
+## Common Mistakes
+
+| Mistake | Fix |
+|---------|-----|
+| Guessing doc_id | Always call `find` first to get exact `doc_id` |
+| Editing without reading | Call `get-text` before `replace-text` to confirm content exists |
+| Permanent delete by default | Keep `--permanent` off unless user explicitly says so |
+| Using doc URL as doc_id | Extract only the alphanumeric ID from the URL, not the full URL |
+| Appending when replace is needed | Use `replace-text` for targeted edits, `append-text` only for additions |
