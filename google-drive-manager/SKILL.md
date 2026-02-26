@@ -7,73 +7,99 @@ description: Use when an AI agent needs to manage files in Google Drive - upload
 
 ## Overview
 
-赋予 AI 代理自主管理 Google Drive 文件的能力。核心规则：**操作前必须先搜索**，通过 `search_files` 获取精确 `file_id`，绝不猜测 ID。
+Enables AI agents to autonomously manage Google Drive files using Service Account authentication.
+Core rule: **search first to get `file_id`** before any update/download/delete operation.
 
 ## When to Use
 
-- 用户说：「上传/备份到云端」、「在 Drive 找文件」、「下载 Drive 文件」、「更新云端文件」、「删除 Drive 文件」
-- 需要 file_id 才能执行 download / update / delete
-- **不适用于**直接下载 Google Docs/Sheets 原生格式（需先导出）
-
-## AI 代理守则
-
-**先搜索，后操作：** download/update/delete 前，必须先调用 `search_files` 获取 `file_id`，绝不猜测。
-
-**路径验证：** `upload_file` / `update_file` 前确认 `local_file_path` 存在。
-
-**错误自修正：** 收到 `{"status": "error"}` 时，读取 `message` 字段并尝试调整参数重试。
-
-**安全默认：** `delete_file` 的 `permanent` 默认为 `false`（移至垃圾桶），除非用户明确说「永久删除」。
-
-## Quick Reference
-
-| 操作 | 工具 | 必填参数 | 触发词 |
-|------|------|----------|--------|
-| 上传 | `upload_file` | local_file_path | 备份、上传、保存到云端 |
-| 搜索 | `search_files` | query_string | 找、列出、查询 Drive |
-| 下载 | `download_file` | file_id, local_save_path | 下载、获取 |
-| 更新 | `update_file` | file_id, local_file_path | 更新、修改、覆写 |
-| 删除 | `delete_file` | file_id | 删除、移除、清除 |
-
-## 串联操作模式
-
-```python
-# 用户: "帮我更新云端上的 report.txt"
-result = drive.search_files("report.txt")   # Step 1: 获取 file_id
-file_id = result["data"][0]["id"]
-drive.update_file(file_id, "/local/report.txt")  # Step 2: 更新内容
-```
+- User says: "upload/backup to cloud", "find file in Drive", "download from Drive", "update cloud file", "delete from Drive"
+- Agent needs `file_id` for download / update / delete
+- **Not for** downloading native Google Docs/Sheets (export first)
 
 ## Setup
 
 ```bash
-pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+pip install -r requirements.txt
 ```
 
-需要 `credentials.json`（Google Cloud Service Account JSON 密钥文件）。
+Place `credentials.json` (Google Cloud Service Account key) in the working directory,
+or set `GOOGLE_CREDENTIALS_PATH=/path/to/credentials.json`.
 
-## Implementation
+Validate credentials:
+```bash
+python scripts/auth.py validate
+```
 
-完整实现见 `google_drive_skill.py`。
+## AI Agent Rules
 
-```python
-from google_drive_skill import GoogleDriveSkill
+**Search-before-operate:** For download/update/delete, ALWAYS call `search` first to get exact `file_id`. Never guess IDs.
 
-drive = GoogleDriveSkill("credentials.json")
+**Path validation:** Before `upload` or `update`, confirm `local_path` exists.
 
-# 搜索文件
-result = drive.search_files("report")
-# → {"status": "success", "data": [{"id": "...", "name": "report.txt", ...}]}
+**Error self-correction:** On `"status": "error"`, read `message` and retry with adjusted params.
 
-# 上传文件
-drive.upload_file("/local/data.csv", custom_file_name="backup_data.csv")
+**Safety default:** `delete` moves to trash by default. Only use `--permanent` when user explicitly says "permanently delete".
+
+## Quick Reference
+
+| Operation | Command | Required Args | Trigger Words |
+|-----------|---------|---------------|---------------|
+| Upload | `upload` | local_path | backup, upload, save to cloud |
+| Search | `search` | query | find, list, search Drive |
+| Download | `download` | file_id, local_path | download, get from Drive |
+| Update | `update` | file_id, local_path | update, modify, overwrite |
+| Delete | `delete` | file_id | delete, remove, trash |
+| List | `list` | [folder_id] | list folder, show contents |
+
+## Chained Operation Pattern
+
+```bash
+# User: "Update report.txt on Drive"
+python scripts/drive.py search "report.txt"
+# → get file_id from result
+python scripts/drive.py update <file_id> ./report.txt
+```
+
+## Usage Examples
+
+```bash
+# Check auth
+python scripts/auth.py status
+python scripts/auth.py validate
+
+# Upload
+python scripts/drive.py upload ./report.pdf --name "Q4 Report.pdf" --folder FOLDER_ID
+
+# Search
+python scripts/drive.py search "quarterly report" --limit 5
+
+# Download
+python scripts/drive.py download FILE_ID ./downloads/report.pdf
+
+# Update (overwrite)
+python scripts/drive.py update FILE_ID ./report_v2.pdf
+
+# Delete (trash)
+python scripts/drive.py delete FILE_ID
+
+# Delete permanently
+python scripts/drive.py delete FILE_ID --permanent
+
+# List folder
+python scripts/drive.py list FOLDER_ID --limit 20
+```
+
+All commands output structured JSON:
+```json
+{"status": "success", "message": "...", "data": {...}}
+{"status": "error",   "message": "..."}
 ```
 
 ## Common Mistakes
 
-| 错误 | 修正 |
-|------|------|
-| 猜测 file_id | 先调用 search_files |
-| 上传不存在的本地文件 | 检查路径后再调用 |
-| 默认永久删除 | 保持 permanent=False |
-| 直接下载 Google Docs | 先导出为 PDF/CSV 再下载 |
+| Mistake | Fix |
+|---------|-----|
+| Guessing file_id | Always call `search` first |
+| Uploading non-existent file | Check path before calling |
+| Permanent delete by default | Keep `--permanent` off unless explicitly asked |
+| Downloading Google Docs natively | Export to PDF/CSV first |
