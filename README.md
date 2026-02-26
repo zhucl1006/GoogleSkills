@@ -1,42 +1,142 @@
 # Google Skills
 
-Claude Code 的 Google 服务技能集合，每个子目录是一个独立的可分发技能。
+A collection of Google service skills for AI agents (Claude Code, Cursor, Codex, etc.).
+Each subdirectory is an independently installable skill.
 
-## 技能列表
+## Skills
 
-| 技能 | 描述 | 状态 |
-|------|------|------|
-| [google-drive-manager](./google-drive-manager/) | Google Drive 文件管理（上传/搜索/下载/更新/删除） | ✅ v1.0.0 |
+| Skill | Description | Version |
+|-------|-------------|---------|
+| [google-drive-manager](./google-drive-manager/) | Upload, search, download, update, and delete files in Google Drive | v1.0.0 |
 
-## 目录结构
+## Installation
 
-```
-googleskills/
-  google-drive-manager/     # Google Drive 文件管理技能
-    SKILL.md                # 技能文档与守则
-    google_drive_skill.py   # Python 实现
-  dist/                     # 打包输出目录
-    google-drive-manager.zip
-```
-
-## 安装技能
-
-将对应技能目录复制到 `~/.claude/skills/` 即可：
+### Option 1 — npx (recommended)
 
 ```bash
-cp -r google-drive-manager ~/.claude/skills/
+npx skills add https://github.com/zhucl1006/GoogleSkills.git
 ```
 
-## 打包分发
+To install a specific skill only:
 
 ```bash
-python3 ~/.claude/skills/skill-creator/scripts/package_skill.py <skill-dir> ./dist
+npx skills add https://github.com/zhucl1006/GoogleSkills.git --skill google-drive-manager
 ```
 
-## 依赖
+### Option 2 — Manual
+
+Clone and copy the skill directory into your agent's skills folder:
 
 ```bash
-pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+# Claude Code
+git clone https://github.com/zhucl1006/GoogleSkills.git
+cp -r GoogleSkills/google-drive-manager ~/.claude/skills/
+
+# Codex / other agents
+cp -r GoogleSkills/google-drive-manager ~/.agents/skills/
 ```
 
-需要 Google Cloud Service Account 的 `credentials.json` 文件。
+---
+
+## google-drive-manager
+
+Enables AI agents to autonomously manage files in Google Drive using a Service Account.
+
+### Prerequisites
+
+1. **Python dependencies**
+
+   ```bash
+   pip install -r google-drive-manager/requirements.txt
+   ```
+
+2. **Google Cloud Service Account credentials**
+
+   - Go to [Google Cloud Console](https://console.cloud.google.com/) → IAM & Admin → Service Accounts
+   - Create a service account and download the JSON key as `credentials.json`
+   - Enable the **Google Drive API** for your project
+   - Share the target Drive folder with the service account email (e.g. `my-agent@project.iam.gserviceaccount.com`)
+
+3. **Set credentials path** (optional, defaults to `./credentials.json`)
+
+   ```bash
+   export GOOGLE_CREDENTIALS_PATH=/path/to/credentials.json
+   ```
+
+4. **Validate setup**
+
+   ```bash
+   python google-drive-manager/scripts/auth.py validate
+   ```
+
+### Usage
+
+All commands output structured JSON: `{"status": "success/error", "message": "...", "data": {...}}`
+
+```bash
+cd google-drive-manager
+
+# Search files
+python scripts/drive.py search "quarterly report"
+python scripts/drive.py search "report" --limit 5
+
+# Upload
+python scripts/drive.py upload ./report.pdf
+python scripts/drive.py upload ./report.pdf --name "Q4 Report.pdf" --folder FOLDER_ID
+
+# Download (requires file_id from search)
+python scripts/drive.py download FILE_ID ./downloads/report.pdf
+
+# Update / overwrite existing file
+python scripts/drive.py update FILE_ID ./report_v2.pdf
+
+# Delete (moves to trash by default)
+python scripts/drive.py delete FILE_ID
+python scripts/drive.py delete FILE_ID --permanent   # irreversible
+
+# List folder contents
+python scripts/drive.py list
+python scripts/drive.py list FOLDER_ID --limit 20
+```
+
+### How the AI agent uses this skill
+
+When the skill is loaded, the agent follows these rules automatically:
+
+- **Search before operate** — for download/update/delete, the agent always calls `search` first to resolve the `file_id`. It never guesses IDs.
+- **Path validation** — before upload/update, the agent confirms the local file exists.
+- **Safe delete** — `delete` moves to trash by default; `--permanent` is only used when the user explicitly says "permanently delete".
+- **Error self-correction** — on `"status": "error"`, the agent reads the `message` and retries with adjusted parameters.
+
+**Example agent interaction:**
+
+> User: "Help me update the report.txt on Drive"
+
+The agent will automatically chain:
+1. `python scripts/drive.py search "report.txt"` → get `file_id`
+2. `python scripts/drive.py update <file_id> ./report.txt` → overwrite
+
+### Project Structure
+
+```
+google-drive-manager/
+  SKILL.md              # Skill definition loaded by the AI agent
+  requirements.txt      # Python dependencies
+  scripts/
+    auth.py             # Credential management (status / validate)
+    drive.py            # All Drive operations CLI
+```
+
+---
+
+## Contributing
+
+To add a new Google service skill:
+
+1. Create a new directory (e.g. `google-sheets-manager/`)
+2. Follow the structure: `SKILL.md` + `requirements.txt` + `scripts/`
+3. Package and validate:
+   ```bash
+   python3 ~/.claude/skills/skill-creator/scripts/package_skill.py <skill-dir> ./dist
+   ```
+4. Update this README's skill table
